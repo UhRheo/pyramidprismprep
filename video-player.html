@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AP Video Library</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d13;
+    --surface: #14161f;
+    --surface-2: #1b1e2a;
+    --border: #262a38;
+    --text: #eef0f7;
+    --text-muted: #8991a8;
+    --accent: #7c6cf5;
+    --accent-2: #22d3c4;
+    --radius: 16px;
+    --shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+    --font-display: "Sora", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4 { font-family: var(--font-display); text-wrap: balance; }
+
+  .page {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 40px 20px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  header.hero { display: flex; flex-direction: column; gap: 6px; }
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-2);
+  }
+  header.hero h1 {
+    margin: 2px 0 4px;
+    font-size: clamp(26px, 5vw, 34px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  header.hero p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1.6;
+    max-width: 62ch;
+  }
+
+  .player-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .player-frame-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: #000;
+  }
+  .player-frame-wrap iframe {
+    position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+  }
+  .player-info { padding: 20px 22px 24px; }
+  .watch-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: #ff5c5c;
+  }
+  .watch-hint { margin: 4px 0 14px; font-size: 12px; color: var(--text-muted); }
+  .now-playing-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--subject-color, var(--accent)) 20%, transparent);
+    color: var(--subject-color, var(--accent));
+    margin-bottom: 12px;
+  }
+  .now-playing-chip::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .player-info h2 {
+    margin: 0 0 10px;
+    font-size: 21px;
+    font-weight: 700;
+  }
+  .player-info p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14.5px;
+    line-height: 1.65;
+    max-width: 68ch;
+  }
+
+  .playlist-group { display: flex; flex-direction: column; gap: 12px; }
+  .playlist-group-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--group-color, var(--text-muted));
+  }
+  .playlist-group-label::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--group-color, var(--text-muted));
+    flex-shrink: 0;
+  }
+
+  .playlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+  }
+
+  .video-card {
+    all: unset;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .video-card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4); }
+  .video-card:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+  .video-card.active {
+    border-color: var(--card-color, var(--accent-2));
+    box-shadow: 0 0 0 1px var(--card-color, var(--accent-2)), 0 14px 28px rgba(0, 0, 0, 0.4);
+  }
+
+  .video-thumb-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: #000;
+  }
+  .video-thumb-wrap img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .thumb-fallback {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--card-color, var(--accent)), color-mix(in srgb, var(--card-color, var(--accent)) 55%, black));
+  }
+  .thumb-fallback svg { width: 30px; height: 30px; opacity: 1; }
+  .play-badge {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(6, 7, 12, 0);
+    transition: background 0.15s ease;
+  }
+  .video-card:hover .play-badge, .video-card.active .play-badge { background: rgba(6, 7, 12, 0.25); }
+  .play-badge svg {
+    width: 34px; height: 34px;
+    opacity: 0;
+    transform: scale(0.82);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  }
+  .video-card:hover .play-badge svg, .video-card.active .play-badge svg { opacity: 1; transform: scale(1); }
+
+  .video-card-body { padding: 11px 13px 13px; display: flex; flex-direction: column; gap: 3px; }
+  .video-card-body .unit-tag {
+    font-family: var(--font-display);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--card-color, var(--text-muted));
+  }
+  .video-card-body h4 {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.4;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  footer.note {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 480px) {
+    .page { padding: 28px 16px 56px; }
+    .player-info { padding: 16px 16px 20px; }
+    .playlist-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="hero">
+    <span class="eyebrow">SyllaSync &middot; Video Library</span>
+    <h1>AP Video Library</h1>
+    <p>Every unit video in one player. Pick a video from the shelf below &mdash; AP Biology, AP World History, or AP Calculus BC &mdash; and it loads up top with full playback controls.</p>
+  </header>
+
+  <section class="player-card" aria-live="polite">
+    <div class="player-frame-wrap">
+      <iframe id="playerFrame" title="Video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+    <div class="player-info">
+      <a class="watch-link" id="watchLink" href="#" target="_blank" rel="noopener">&#9654; Watch on YouTube &#8599;</a>
+      <p class="watch-hint">If the player above doesn't load, use the link to open it directly on YouTube.</p>
+      <span class="now-playing-chip" id="nowPlayingChip">Now Playing</span>
+      <h2 id="nowPlayingTitle"></h2>
+      <p id="nowPlayingBlurb"></p>
+    </div>
+  </section>
+
+  <div id="playlist"></div>
+
+  <footer class="note">Videos are embedded from their original YouTube uploads. Use the player's own controls for play, pause, seek, volume, and fullscreen.</footer>
+</div>
+
+<script>
+  const VIDEOS = [
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 1", title: "Chemistry of Life", videoId: "X1idfNwjJYU",
+      blurb: "Water's polarity and hydrogen bonding, the four major macromolecules, dehydration synthesis vs. hydrolysis, and how enzymes lower activation energy."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 2", title: "Cell Structure and Function", videoId: "h0JkytGr07o",
+      blurb: "The fluid mosaic membrane, passive vs. active transport, key organelles, the endosymbiotic theory, and surface-area-to-volume ratio."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 3", title: "Cellular Energetics", videoId: "AOtJk7pq0bs",
+      blurb: "Photosynthesis's light reactions and Calvin cycle, plus glycolysis, the Krebs cycle, and oxidative phosphorylation in cellular respiration."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 4", title: "Cell Communication and Cell Cycle", videoId: "_Ad5WG_R0j8",
+      blurb: "Signal transduction (reception, transduction, response), cell cycle checkpoints, mitosis vs. meiosis, and apoptosis."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 5", title: "Heredity", videoId: "JwQpAU9SQRM",
+      blurb: "Mendel's laws of segregation and independent assortment, non-Mendelian inheritance, linked genes, and nondisjunction."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 6", title: "Gene Expression and Regulation", videoId: "iNE_t7lodfs",
+      blurb: "The central dogma, transcription and translation, the lac operon, mutations, and eukaryotic gene regulation."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 7", title: "Natural Selection", videoId: "eeMCQstdr70",
+      blurb: "Evidence for evolution, Hardy-Weinberg equilibrium, patterns of selection, speciation, and genetic drift."
+    },
+    {
+      subject: "AP Biology", color: "#2f9e6e", unit: "Unit 8", title: "Ecology", videoId: "jBrepVbmNG4",
+      blurb: "Energy flow through trophic levels, population growth models, species interactions, and biogeochemical cycles."
+    },
+    {
+      subject: "AP World History", color: "#c1552c", unit: "Unit 1", title: "The Global Tapestry (1200–1450)", videoId: "xDkPq5KcbS4",
+      blurb: "Song China, the Dar al-Islam, Sub-Saharan African states, Mesoamerican and Andean societies, and feudal Europe before 1450."
+    },
+    {
+      subject: "AP Calculus BC", color: "#3a6ea5", unit: "Unit 1", title: "Limits and Continuity", videoId: "SVb9OV0bLzI",
+      blurb: "Estimating and evaluating limits, one-sided limits, continuity, the Intermediate Value Theorem, and types of discontinuities."
+    }
+  ];
+
+  function embedUrl(id, autoplay) {
+    return "https://www.youtube.com/embed/" + id + "?rel=0" + (autoplay ? "&autoplay=1" : "");
+  }
+
+  const frame = document.getElementById("playerFrame");
+  const watchLink = document.getElementById("watchLink");
+  const chip = document.getElementById("nowPlayingChip");
+  const titleEl = document.getElementById("nowPlayingTitle");
+  const blurbEl = document.getElementById("nowPlayingBlurb");
+  const playlistEl = document.getElementById("playlist");
+
+  function playVideo(index, autoplay) {
+    const v = VIDEOS[index];
+    frame.src = embedUrl(v.videoId, autoplay);
+    watchLink.href = "https://www.youtube.com/watch?v=" + v.videoId;
+    frame.style.setProperty("--subject-color", v.color);
+    document.querySelector(".player-info").style.setProperty("--subject-color", v.color);
+    chip.style.setProperty("--subject-color", v.color);
+    chip.textContent = v.subject + " \u00b7 " + v.unit;
+    titleEl.textContent = v.title;
+    blurbEl.textContent = v.blurb;
+    document.querySelectorAll(".video-card").forEach((card, i) => {
+      card.classList.toggle("active", i === index);
+      card.setAttribute("aria-pressed", i === index ? "true" : "false");
+    });
+  }
+
+  function playIcon() {
+    return '<svg viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="12" fill="rgba(20,22,31,0.55)"/><path d="M9.5 7.5v9l7-4.5z" fill="white"/></svg>';
+  }
+
+  function buildPlaylist() {
+    const groups = [];
+    VIDEOS.forEach((v, i) => {
+      let group = groups.find((g) => g.subject === v.subject);
+      if (!group) { group = { subject: v.subject, color: v.color, items: [] }; groups.push(group); }
+      group.items.push({ ...v, index: i });
+    });
+
+    playlistEl.innerHTML = groups.map((group) => `
+      <div class="playlist-group" style="margin-bottom:24px;">
+        <div class="playlist-group-label" style="--group-color:${group.color}">${group.subject} &middot; ${group.items.length} video${group.items.length === 1 ? "" : "s"}</div>
+        <div class="playlist-grid">
+          ${group.items.map((v) => `
+            <button type="button" class="video-card" data-index="${v.index}" style="--card-color:${v.color}" aria-pressed="false">
+              <div class="video-thumb-wrap">
+                <img src="https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg" alt="${v.title}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="thumb-fallback">${playIcon()}</div>
+                <div class="play-badge">${playIcon()}</div>
+              </div>
+              <div class="video-card-body">
+                <span class="unit-tag">${v.unit}</span>
+                <h4>${v.title}</h4>
+              </div>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+
+    playlistEl.querySelectorAll(".video-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        playVideo(Number(card.dataset.index), true);
+        card.scrollIntoView({ block: "nearest" });
+        document.querySelector(".player-card").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
+  buildPlaylist();
+  playVideo(0, false);
+</script>
+</body>
+</html>
