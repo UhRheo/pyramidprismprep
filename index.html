@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyllaSync &mdash; Planner, Schedule, Grades &amp; AP/SAT Prep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="brand"><span class="brand-mark">&#10022;</span>Sylla<span>Sync</span></div>
+    <div class="nav-group">
+      <a class="nav-link" data-route="dashboard" href="#/dashboard"><span class="icon">&#127968;</span> Dashboard</a>
+      <a class="nav-link" data-route="planner" href="#/planner"><span class="icon">&#128203;</span> Planner</a>
+      <a class="nav-link" data-route="schedule" href="#/schedule"><span class="icon">&#128197;</span> Schedule Maker</a>
+      <a class="nav-link" data-route="grades" href="#/grades"><span class="icon">&#128202;</span> Grades &amp; Tests</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Study</div>
+      <a class="nav-link" data-route="ap" href="#/ap"><span class="icon">&#127891;</span> AP Exam Prep</a>
+      <a class="nav-link" data-route="videos" href="#/videos"><span class="icon">&#127916;</span> Video Library</a>
+      <a class="nav-link" data-route="sat" href="#/sat"><span class="icon">&#9997;&#65039;</span> SAT Practice</a>
+    </div>
+  </nav>
+  <main class="main" id="app"></main>
+</div>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
