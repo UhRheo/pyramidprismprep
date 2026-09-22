@@ -47,7 +47,8 @@ const KEYS = {
   courses: "sh_grades_courses",
   apProgress: "sh_ap_progress",
   satDaily: "sh_sat_daily",
-  satHistory: "sh_sat_quiz_history"
+  satHistory: "sh_sat_quiz_history",
+  profile: "sh_profile"
 };
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -75,9 +76,83 @@ function navigate(path) {
 }
 window.addEventListener("hashchange", render);
 window.addEventListener("DOMContentLoaded", () => {
+  if (loadData(KEYS.profile, null)) {
+    showApp();
+  } else {
+    showAuth();
+  }
+});
+
+/* ============================================================ AUTH / PROFILE GATE */
+function initials(name) {
+  const trimmed = (name || "").trim();
+  return trimmed ? trimmed.slice(0, 2).toUpperCase() : "?";
+}
+
+function showApp() {
+  document.getElementById("auth-screen").hidden = true;
+  document.getElementById("app-shell").hidden = false;
   if (!location.hash) location.hash = "#/dashboard";
   render();
   requestAnimationFrame(() => document.body.classList.add("ready"));
+}
+
+function showAuth() {
+  document.getElementById("app-shell").hidden = true;
+  document.getElementById("auth-screen").hidden = false;
+  renderAuthScreen();
+  requestAnimationFrame(() => document.body.classList.add("ready"));
+}
+
+function renderAuthScreen() {
+  const authEl = document.getElementById("auth-screen");
+  authEl.innerHTML = `
+    <div class="auth-card">
+      <div class="auth-status"><span class="dot"></span> System Ready <span class="dot"></span></div>
+      <div class="auth-mark">&#10022;</div>
+      <div class="auth-eyebrow">Pyramid Prism Prep</div>
+      <h1>Initialize Terminal</h1>
+      <p class="auth-sub">Enter a callsign to spin up your personal study terminal on this device.</p>
+      <form id="auth-form">
+        <input type="text" id="auth-name" placeholder="Callsign (your name)" maxlength="24" required autofocus>
+        <button type="submit">Enter System &rarr;</button>
+      </form>
+      <p class="auth-note">This just personalizes your dashboard and saves your data in this browser &mdash; it's not a secure account (there's no server to check a password against), so treat it as a nameplate, not a lock.</p>
+    </div>
+  `;
+  document.getElementById("auth-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = document.getElementById("auth-name").value.trim();
+    if (!name) return;
+    saveData(KEYS.profile, { name, joinedAt: todayISO() });
+    showApp();
+  });
+}
+
+function renderSidebarFooter() {
+  const footer = document.getElementById("sidebar-footer");
+  if (!footer) return;
+  const profile = loadData(KEYS.profile, null);
+  if (!profile) { footer.innerHTML = ""; return; }
+  footer.innerHTML = `
+    <div class="profile-chip">
+      <div class="profile-avatar">${escapeHtml(initials(profile.name))}</div>
+      <div class="profile-info">
+        <div class="profile-name">${escapeHtml(profile.name)}</div>
+        <button type="button" class="profile-switch" data-action="switch-profile">Switch profile</button>
+      </div>
+    </div>
+  `;
+}
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest('[data-action="switch-profile"]');
+  if (!el) return;
+  if (confirm("Switch profile? Your planner, grades, and schedule data stay saved on this browser.")) {
+    localStorage.removeItem(KEYS.profile);
+    document.body.classList.remove("ready");
+    showAuth();
+  }
 });
 
 function render() {
@@ -86,6 +161,7 @@ function render() {
   document.querySelectorAll(".nav-link").forEach((el) => {
     el.classList.toggle("active", el.dataset.route === root);
   });
+  renderSidebarFooter();
   const app = document.getElementById("app");
   let html = "";
   switch (root) {
@@ -138,11 +214,12 @@ function viewDashboard() {
 
   const dailyQ = getDailyQuestion();
   const satAnswered = loadData(KEYS.satDaily, {})[dailyQ.dateKey];
+  const profile = loadData(KEYS.profile, null);
 
   return `
     <div class="page-header">
       <div>
-        <h1>Welcome back</h1>
+        <h1>Welcome back${profile ? ", " + escapeHtml(profile.name) : ""}</h1>
         <p class="subtitle">${new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
       </div>
     </div>
