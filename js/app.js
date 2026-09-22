@@ -1,14 +1,22 @@
-/* ---------- storage helpers ---------- */
+/* ---------- cloud storage helpers (Firestore-backed, per account) ---------- */
+let cloudData = {};
+let cloudUid = null;
+
+function loadCloudData(uid) {
+  cloudUid = uid;
+  return db.collection("users").doc(uid).get().then((snap) => {
+    cloudData = snap.exists ? snap.data() : {};
+  });
+}
+
 function loadData(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    return fallback;
-  }
+  return key in cloudData ? cloudData[key] : fallback;
 }
 function saveData(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  cloudData[key] = value;
+  if (!cloudUid) return;
+  db.collection("users").doc(cloudUid).set({ [key]: value }, { merge: true })
+    .catch((err) => console.error("Cloud save failed for " + key, err));
 }
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -47,8 +55,7 @@ const KEYS = {
   courses: "sh_grades_courses",
   apProgress: "sh_ap_progress",
   satDaily: "sh_sat_daily",
-  satHistory: "sh_sat_quiz_history",
-  profile: "sh_profile"
+  satHistory: "sh_sat_quiz_history"
 };
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -75,19 +82,28 @@ function navigate(path) {
   location.hash = "#/" + path;
 }
 window.addEventListener("hashchange", render);
-window.addEventListener("DOMContentLoaded", () => {
-  if (loadData(KEYS.profile, null)) {
-    showApp();
-  } else {
-    showAuth();
-  }
-});
 
-/* ============================================================ AUTH / PROFILE GATE */
+/* ============================================================ AUTH / ACCOUNT GATE */
 function initials(name) {
   const trimmed = (name || "").trim();
   return trimmed ? trimmed.slice(0, 2).toUpperCase() : "?";
 }
+
+let authMode = "login";
+
+window.addEventListener("DOMContentLoaded", () => {
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      loadCloudData(user.uid)
+        .then(showApp)
+        .catch(() => showAuth("Couldn't load your data. Try refreshing the page."));
+    } else {
+      cloudData = {};
+      cloudUid = null;
+      showAuth();
+    }
+  });
+});
 
 function showApp() {
   document.getElementById("auth-screen").hidden = true;
@@ -97,62 +113,104 @@ function showApp() {
   requestAnimationFrame(() => document.body.classList.add("ready"));
 }
 
-function showAuth() {
+function showAuth(errorMsg) {
   document.getElementById("app-shell").hidden = true;
   document.getElementById("auth-screen").hidden = false;
-  renderAuthScreen();
+  renderAuthScreen(errorMsg);
   requestAnimationFrame(() => document.body.classList.add("ready"));
 }
 
-function renderAuthScreen() {
+function friendlyAuthError(err) {
+  const map = {
+    "auth/email-already-in-use": "That email already has an account. Try signing in instead.",
+    "auth/invalid-email": "That email address doesn't look right.",
+    "auth/weak-password": "Your password needs to be at least 6 characters.",
+    "auth/user-not-found": "No account found with that email.",
+    "auth/wrong-password": "That password doesn't match.",
+    "auth/invalid-credential": "Email or password is incorrect.",
+    "auth/too-many-requests": "Too many attempts. Wait a bit and try again.",
+    "auth/network-request-failed": "Couldn't reach the server. Check your connection."
+  };
+  return (err && map[err.code]) || "Something went wrong. Try again.";
+}
+
+function renderAuthScreen(message) {
   const authEl = document.getElementById("auth-screen");
+  const isSignup = authMode === "signup";
   authEl.innerHTML = `
     <div class="auth-card">
       <div class="auth-status"><span class="dot"></span> System Ready <span class="dot"></span></div>
       <div class="auth-mark">&#10022;</div>
       <div class="auth-eyebrow">Pyramid Prism Prep</div>
-      <h1>Initialize Terminal</h1>
-      <p class="auth-sub">Enter a callsign to spin up your personal study terminal on this device.</p>
+      <h1>${isSignup ? "Create Account" : "Sign In"}</h1>
+      <p class="auth-sub">${isSignup ? "Set up an account so your data follows you to any device." : "Sign in to pick up where you left off."}</p>
+      ${message ? `<p class="auth-message">${escapeHtml(message)}</p>` : ""}
       <form id="auth-form">
-        <input type="text" id="auth-name" placeholder="Callsign (your name)" maxlength="24" required autofocus>
-        <button type="submit">Enter System &rarr;</button>
+        ${isSignup ? `<input type="text" id="auth-name" placeholder="Your name" maxlength="24" required>` : ""}
+        <input type="email" id="auth-email" placeholder="Email" required>
+        <input type="password" id="auth-password" placeholder="Password" minlength="6" required>
+        <button type="submit">${isSignup ? "Create Account" : "Sign In"} &rarr;</button>
       </form>
-      <p class="auth-note">This just personalizes your dashboard and saves your data in this browser &mdash; it's not a secure account (there's no server to check a password against), so treat it as a nameplate, not a lock.</p>
+      <p class="auth-toggle">${isSignup ? "Already have an account?" : "Need an account?"} <button type="button" id="auth-toggle-btn" class="link-btn">${isSignup ? "Sign in" : "Create one"}</button></p>
+      ${!isSignup ? `<button type="button" id="auth-forgot-btn" class="link-btn small">Forgot password?</button>` : ""}
     </div>
   `;
+
+  document.getElementById("auth-toggle-btn").addEventListener("click", () => {
+    authMode = isSignup ? "login" : "signup";
+    renderAuthScreen();
+  });
+
+  const forgotBtn = document.getElementById("auth-forgot-btn");
+  if (forgotBtn) {
+    forgotBtn.addEventListener("click", () => {
+      const email = document.getElementById("auth-email").value.trim();
+      if (!email) { renderAuthScreen("Type your email above first, then click Forgot password."); return; }
+      auth.sendPasswordResetEmail(email)
+        .then(() => renderAuthScreen("Password reset email sent. Check your inbox."))
+        .catch((err) => renderAuthScreen(friendlyAuthError(err)));
+    });
+  }
+
   document.getElementById("auth-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const name = document.getElementById("auth-name").value.trim();
-    if (!name) return;
-    saveData(KEYS.profile, { name, joinedAt: todayISO() });
-    showApp();
+    const email = document.getElementById("auth-email").value.trim();
+    const password = document.getElementById("auth-password").value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    if (isSignup) {
+      const name = document.getElementById("auth-name").value.trim();
+      auth.createUserWithEmailAndPassword(email, password)
+        .then((cred) => cred.user.updateProfile({ displayName: name }))
+        .catch((err) => { submitBtn.disabled = false; renderAuthScreen(friendlyAuthError(err)); });
+    } else {
+      auth.signInWithEmailAndPassword(email, password)
+        .catch((err) => { submitBtn.disabled = false; renderAuthScreen(friendlyAuthError(err)); });
+    }
   });
 }
 
 function renderSidebarFooter() {
   const footer = document.getElementById("sidebar-footer");
   if (!footer) return;
-  const profile = loadData(KEYS.profile, null);
-  if (!profile) { footer.innerHTML = ""; return; }
+  const user = auth.currentUser;
+  if (!user) { footer.innerHTML = ""; return; }
+  const label = user.displayName || user.email;
   footer.innerHTML = `
     <div class="profile-chip">
-      <div class="profile-avatar">${escapeHtml(initials(profile.name))}</div>
+      <div class="profile-avatar">${escapeHtml(initials(label))}</div>
       <div class="profile-info">
-        <div class="profile-name">${escapeHtml(profile.name)}</div>
-        <button type="button" class="profile-switch" data-action="switch-profile">Switch profile</button>
+        <div class="profile-name">${escapeHtml(label)}</div>
+        <button type="button" class="profile-switch" data-action="log-out">Log out</button>
       </div>
     </div>
   `;
 }
 
 document.addEventListener("click", (e) => {
-  const el = e.target.closest('[data-action="switch-profile"]');
+  const el = e.target.closest('[data-action="log-out"]');
   if (!el) return;
-  if (confirm("Switch profile? Your planner, grades, and schedule data stay saved on this browser.")) {
-    localStorage.removeItem(KEYS.profile);
-    document.body.classList.remove("ready");
-    showAuth();
-  }
+  auth.signOut();
 });
 
 function render() {
@@ -214,12 +272,13 @@ function viewDashboard() {
 
   const dailyQ = getDailyQuestion();
   const satAnswered = loadData(KEYS.satDaily, {})[dailyQ.dateKey];
-  const profile = loadData(KEYS.profile, null);
+  const user = auth.currentUser;
+  const firstName = user && user.displayName ? user.displayName.split(" ")[0] : null;
 
   return `
     <div class="page-header">
       <div>
-        <h1>Welcome back${profile ? ", " + escapeHtml(profile.name) : ""}</h1>
+        <h1>Welcome back${firstName ? ", " + escapeHtml(firstName) : ""}</h1>
         <p class="subtitle">${new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
       </div>
     </div>
@@ -263,7 +322,7 @@ function viewDashboard() {
         <p class="meta">${dailyQ.q.section}</p>
         <p>${escapeHtml(dailyQ.q.q)}</p>
         ${satAnswered
-          ? `<p class="meta">You answered this one &mdash; ${satAnswered.correct ? "correct! &#9989;" : "not quite. &#10060;"} <a href="#/sat">Review &rarr;</a></p>`
+          ? `<p class="meta">You already answered this one today. ${satAnswered.correct ? "Correct! &#9989;" : "Not quite. &#10060;"} <a href="#/sat">Review &rarr;</a></p>`
           : `<a href="#/sat"><button>Answer Today's Question</button></a>`}
       </div>
     </div>
@@ -321,7 +380,7 @@ function viewPlanner() {
             <span class="badge ${t.priority}">${t.priority}</span>
             <button class="icon-btn" data-action="delete-task" data-id="${t.id}">&#10005;</button>
           </div>
-          <textarea class="task-notes" style="${t.notesHeight ? `height:${t.notesHeight};` : ""}" placeholder="Add notes for this task &mdash; drag the corner to expand&hellip;" data-action="save-notes" data-id="${t.id}">${escapeHtml(t.notes || "")}</textarea>
+          <textarea class="task-notes" style="${t.notesHeight ? `height:${t.notesHeight};` : ""}" placeholder="Add notes for this task, and drag the corner to expand it." data-action="save-notes" data-id="${t.id}">${escapeHtml(t.notes || "")}</textarea>
         </div>`).join("") : `<div class="empty-state">No tasks in this view.</div>`}
     </div>
   `;
@@ -423,7 +482,7 @@ function viewSchedule() {
             <div class="meta">${DAY_NAMES[b.day]} &middot; ${formatTime(b.start)}&ndash;${formatTime(b.end)}${b.location ? " &middot; " + escapeHtml(b.location) : ""}</div>
           </div>
           <button class="icon-btn" data-action="delete-block" data-id="${b.id}">&#10005;</button>
-        </div>`).join("") : `<div class="empty-state">No blocks yet &mdash; add your first class above.</div>`}
+        </div>`).join("") : `<div class="empty-state">No blocks yet. Add your first class above.</div>`}
     </div>
   `;
 }
@@ -508,7 +567,7 @@ function viewGrades(parts) {
             <button class="danger" data-action="delete-course" data-id="${c.id}">Delete</button>
           </div>
         </div>`;
-      }).join("") : `<div class="empty-state">No courses yet &mdash; add one above.</div>`}
+      }).join("") : `<div class="empty-state">No courses yet. Add one above.</div>`}
     </div>
   `;
 }
@@ -542,7 +601,7 @@ function viewCourseDetail(courses, courseId) {
             <div class="grow">${escapeHtml(c.name)}</div>
             <span class="badge">${c.weight}%</span>
             <button class="icon-btn" data-action="delete-category" data-course="${course.id}" data-id="${c.id}">&#10005;</button>
-          </div>`).join("") : `<div class="empty-state">No categories &mdash; all assignments weighted equally.</div>`}
+          </div>`).join("") : `<div class="empty-state">No categories yet, so all assignments are weighted equally.</div>`}
       </div>
 
       <div class="card">
@@ -584,7 +643,7 @@ function viewCourseDetail(courses, courseId) {
           const pct = a.max ? ((a.score / a.max) * 100).toFixed(1) : "-";
           return `<tr>
             <td>${escapeHtml(a.name)}</td>
-            <td>${cat ? escapeHtml(cat.name) : "&mdash;"}</td>
+            <td>${cat ? escapeHtml(cat.name) : "None"}</td>
             <td>${a.score} / ${a.max}</td>
             <td>${pct}%</td>
             <td><button class="icon-btn" data-action="delete-assignment" data-course="${course.id}" data-id="${a.id}">&#10005;</button></td>
@@ -750,7 +809,7 @@ function viewVideoLibrary() {
 
   return `
     <div class="page-header">
-      <div><h1>Video Library</h1><p class="subtitle">Every AP unit video in one player &mdash; pick one from the shelf below</p></div>
+      <div><h1>Video Library</h1><p class="subtitle">Every AP unit video in one player. Pick one from the shelf below.</p></div>
     </div>
     <div class="card">
       <div class="video-embed">
