@@ -62,7 +62,7 @@ const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satu
 const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const BLOCK_COLORS = ["#3a6ea5", "#2f9e6e", "#c1552c", "#8e5bb5", "#d9534f", "#e0a020", "#2596be"];
 const SCHEDULE_START_HOUR = 7;
-const SCHEDULE_END_HOUR = 21;
+const SCHEDULE_END_HOUR = 24;
 
 function todayDayIndex() {
   const jsDay = new Date().getDay(); // 0 = Sunday
